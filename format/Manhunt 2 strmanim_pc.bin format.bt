@@ -1,0 +1,97 @@
+//--------------------------------------
+//--- 010 Editor v6.0.1 Binary Template
+//
+// File: Manhunt 2 strmanim_pc.bin Anim Format
+// Author: Allen(Leeao)
+// Revision:
+// Purpose:Manhunt 2 Execution/Environmental Exec animation
+//--------------------------------------
+
+#include "Manhunt IFP anim library.bt"
+
+struct ExecutionEntry{
+DWORD   ExecutionID;
+DWORD   JumpExectuionOffset;
+DWORD   JumpExectuionSize;
+DWORD   WhileLevelExecOffset;
+DWORD   WhileLevelExecSize;
+DWORD   YellowLevelExecOffset;
+DWORD   YellowLevelExecSize;
+DWORD   RedLevelExecOffset;
+DWORD   RedLevelExecSize;
+};
+
+struct EnvExec{
+DWORD   ExecutionID;
+DWORD   EnvExecOffset;
+DWORD   EnvExecSize;
+};
+
+DWORD   ID;
+DWORD   numExec;//umber of executions
+DWORD   numEnvExec;//Number of environmental exec.
+
+ExecutionEntry exec [numExec];
+EnvExec envExec [numEnvExec];
+
+local int i;
+for (i=0;i<numExec;i++)
+{   
+    if(exec[i].JumpExectuionOffset>0){
+    FSeek(exec[i].JumpExectuionOffset);
+    ANPK JumpANIM;}
+
+    if(exec[i].WhileLevelExecOffset>0){
+    FSeek(exec[i].WhileLevelExecOffset);
+    ANPK WhileLevelANIM;}
+
+    if(exec[i].YellowLevelExecOffset>0){
+    FSeek(exec[i].YellowLevelExecOffset);
+    ANPK YellowLevelANIM;}
+
+    if(exec[i].RedLevelExecOffset>0){
+    FSeek(exec[i].RedLevelExecOffset);
+    ANPK RedLevelANIM;}
+}
+for (i=0;i<numEnvExec;i++)
+{   
+    if(envExec[i].EnvExecOffset>0){
+    FSeek(envExec[i].EnvExecOffset);
+    ANPK EnvExecANIM;}
+}
+
+
+/*
+The following sections from the Majestic in projectmanhunt.com/forums
+Header - 12 bytes
+4b int32 - some ID (always = 1)
+4b int32 - Number of executions
+4b int32 - Number of environmental exec.
+Executions allocation table (ExecEntry = 36 bytes) table size = Number of executions*ExecEntry
+
+Array of ExecEntry
+4b - int32 - Execution ID
+4b - Jump execution offset (in firearms always = 0)
+4b - Jump execution size (in firearms always = 0)
+4b - White level execution offset
+4b - White level execution size
+4b - Yellow level execution offset
+4b - Yellow level execution size
+4b - Red level execution offset
+4b - Red level execution size
+
+And then there writed env executions with follows structure:
+
+Environmental executions allocation table (EnvExecEntry = 12 bytes) table size = Number of executions*EnvExecEntry
+
+Array of EnvExecEntry 
+4b - int32 - Execution ID
+4b - Env exec offset
+4b - Env exec size
+Here I write what you can do:
+For example you want to replace red level execution of standard uzi.
+Check execution table and find necessary execution entry (UZI execution ID = 37)
+then set "Red level execution offset" equal to entire strmanim size.
+then set "Red level execution size" equal to your new execution size
+Then go to the end of strmanim and paste your new execution after last strmanim byte
+*/

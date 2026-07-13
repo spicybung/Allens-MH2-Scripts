@@ -1,0 +1,12 @@
+//--------------------------------------
+//--- 010 Editor v6.0 Binary Template
+//
+// File:Manhunt 1/2 IFP Format
+// Author: Allen(Leeao)
+// Revision:
+// Purpose:Manhunt 1/2 Animation
+//--------------------------------------
+
+
+#include "Manhunt IFP anim library.bt"
+ANCT anct;

@@ -1,0 +1,6 @@
+How to Install & Run
+-----------
+
+Put  "Manhunt2_Tools" and "Startup" folder into your %3dsMax% "scripts" folder.
+
+When you start MAX, The script will auto run at Utility Panel.

@@ -1,0 +1,80 @@
+//--------------------------------------
+//--- 010 Editor v6.0 Binary Template
+//
+// File: Manhunt 1/2 *.col collision format
+// Author:CJ2000,Allen(correction some data)
+// Revision:
+// Purpose:Manhunt 1/2 collision format
+//--------------------------------------
+
+
+
+
+typedef struct{
+    float   X;
+    float   Y;
+    float   Z;
+}TVector;
+
+typedef struct{
+    TVector center;
+    float   radius;
+    TVector min;
+    TVector max;
+}TBounds;
+
+typedef struct{
+    ubyte material;
+    ubyte flag;
+    ubyte brightness;
+    ubyte light;
+}TSurface;
+
+typedef struct{
+    TVector center;
+    float radius;
+    TSurface surface;
+}TSphere;
+
+typedef struct{
+    TVector VALUE[2];
+}Lines;
+
+typedef struct{
+    TVector min;
+    TVector max;
+    TSurface surface;
+}TBox;
+
+typedef struct{
+    TVector XYZ;
+}TVertex;
+
+typedef struct{
+    DWORD   VertID[3];
+}TFace;
+
+typedef struct{
+    local byte padLen = 4-(FTell() % 4);
+    if ((padLen < 4) && (padLen > 0)) byte pad[padLen];
+}Padding;
+//allows null data object, but does not allow BOX bounding empty.
+//Tsurface and Tbox unused in Manhunt 1/2
+typedef struct{
+    string  name;
+    Padding padding;
+    TBounds bounds;
+    DWORD   numSpheres;
+    TSphere spheres[numSpheres];
+    DWORD   numLines;
+    Lines   lines[numLines];
+    DWORD   numBoxes;
+    TBox    boxes[numBoxes];
+    int     numVertex;
+    TVertex vertices[numVertex];
+    DWORD   numFaces;
+    TFace   faces[numFaces];
+}TModel;
+
+DWORD   colmodels;
+TModel  models[colmodels]<optimize=false>;

@@ -1,0 +1,736 @@
+//--------------------------------------
+//--- 010 Editor v5.0 Binary Template
+//
+// File: Manhunt 1 dff file
+// Author: Allen (base on http://gtamodding.ru/wiki/DFF and https://gtamods.com/wiki/List_of_RW_section_IDs)
+// Revision:
+// Purpose:
+//--------------------------------------
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+}rwChunk;
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    if(ChunkSize>0)
+    byte    data[ChunkSize];
+}rwUnknownChunk;
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    DWORD   numAtomics;
+    DWORD   numLights;
+    DWORD   numCameras;
+    /*int32 - Number of Atomics
+    int32 - Number of Lights - only present after version 0x33000
+    int32 - Number of Cameras - only present after version 0x33000 but 0 in all GTA files
+    */
+}rwClumpStruct;
+
+typedef struct {
+    float   RotationMatrix3X3[9];
+    float   Position[3];
+    int     ParentFrame;//-1 is not
+    int     MatrixCreationFlags ;//The Flags DWORD under the Frame Data section was the internal flags of the matrix at the time it was written to file. 
+//The flags are only written, they are of course read back in but are never used.
+}rwFrameData;
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    DWORD   FrameCount;
+    rwFrameData Frame[FrameCount]<optimize=false>;
+}rwFrameListStruct;
+
+typedef struct(DWORD NameLength){
+    //DWORD   rwID<format=hex>;//0x253F2FE
+    //DWORD   NameLength;
+    //DWORD   rwVersion<format=hex>;
+    char    FrameName[NameLength];
+}rwFrame;
+
+typedef struct{
+    //DWORD   rwID<format=hex>;//0x11E
+    //DWORD   ChunkSize;
+    //DWORD   rwVersion<format=hex>;
+    DWORD   hAnimVersion;
+    DWORD   BoneID;//Animation Bone ID
+    DWORD   BoneCount;//if > 0 this bone is root bone
+    if (BoneCount>0)
+    {
+        int     flags;
+        int     keyFrameSize;//每笔动画关键帧的信息大小（以字节为单位）
+        struct{
+            DWORD   BoneID;//Animation Bone ID
+            DWORD   BoneIndex;//Bone Index of Bone Array 数组中骨骼的索引
+            DWORD   BoneType;
+        }BoneInfo[BoneCount];
+    }//end if
+    rwChunk FrameHeader;//独立区块不包含在HAnimPLG的区块大小内，但是连在一起存储。
+    rwFrame FrameName(FrameHeader.ChunkSize);
+}rwHAnimPLG;
+
+typedef struct{
+DWORD   rwID<format=hex>;//0x3
+DWORD   ChunkSize;
+DWORD   rwVersion<format=hex>;
+if(ChunkSize>0)
+{
+rwChunk ChunkHeader;
+switch( ChunkHeader.rwID ) 
+{
+    case 0x253F2FE : 
+    {
+        rwFrame FrameName(ChunkHeader.ChunkSize);
+    }; break;
+    case 0x11E : 
+    {
+        rwHAnimPLG HAnimPLG;
+    }; break;
+    default : 
+    {
+        byte    UnknownData[ChunkSize];
+    };
+} //end switch
+}
+}rwFrameExtension;
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    DWORD   GeometryCount;
+}rwGeometryListStruct;
+
+typedef struct
+{
+short	VertexID2;
+short	VertexID1;
+short   MatID;
+short	VertexID3;
+}Face;
+
+typedef struct
+{
+float   U;
+float   V;
+}UV;
+
+typedef struct{
+float   XYZ[3];
+}Vertex;
+typedef struct{
+float   XYZ[3];
+}Normal;
+
+typedef struct{
+float   boundingSphereXYZ_Radius[4];
+}RwSphere;
+
+typedef struct{
+float   uniform;
+float   scattered;
+float   specular;
+}LightHeader;//not use,heading of lighting subsection
+
+typedef struct{
+ubyte   RGBA[4];
+}PreLit;
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    WORD    FormatFlags<format=binary>;
+    ubyte   NumTexCoorsCustom; // if this value is greater than zero, Flags Textured and Textured_2. ignored. Allows you to specify an arbitrary (1 - 8) number of texture coordinates.
+    ubyte   GeometryNativeFlags;// 0x01 rpGEOMETRYNATIVE 0x02 rpGEOMETRYNATIVEINSTANCE
+    DWORD   FaceCount;
+    DWORD   VertexCount;
+    DWORD   numMorphTargets;//number of morph targets (numMorphTargets) (morphing is not used in GTA series, so this is always 1)
+    local int GeometryTristrip = FormatFlags % 2;//FormatFlags & 1;
+    local int GeometryMeshes = (FormatFlags & 3) >> 1;
+    local int GeometryTextured = (FormatFlags & 7) >> 2;
+    local int GeometryPrelit = (FormatFlags & 0xF) >> 3;
+    local int GeometryNormals = (FormatFlags & 0x1F) >> 4;
+    local int GeometryLight = (FormatFlags & 0x3F) >> 5;
+    local int GeometryModulateMaterialColor = (FormatFlags & 0x7F) >> 6;
+    local int GeometryTextured_2 = (FormatFlags & 0xFF) >> 7;
+    if (GeometryPrelit==1) PreLit VertexColors[VertexCount];
+    if ((GeometryTextured==1)||(GeometryTextured_2==1)) UV      UV1[VertexCount];
+    if (GeometryTextured_2==1) UV      UV2[VertexCount];
+    if (GeometryMeshes==1) Face  face[FaceCount];
+    RwSphere    bounding;
+    int     positionFlag;//has a position
+    int     normalFlag;//has normals
+    if (GeometryMeshes==1) Vertex  vertex[VertexCount];
+    if (GeometryNormals==1) Normal  normal[VertexCount];
+}rwGeometryStruct;
+
+
+
+typedef struct{
+    DWORD   rwID<format=hex>;//0x2
+    DWORD   Length;
+    DWORD   rwVersion<format=hex>;
+    char    Name[Length];//4 byte alignment, not enough to fill with 0
+}rwString;
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    byte   TextureFilter;//Texture Filter Mode Flags
+    byte   UVaddressing; 
+    short  UseMipLevelFlag;
+    local byte U_addressing=UVaddressing>>4;
+    local byte V_addressing=UVaddressing&0xF;
+    local byte useMipLevelFlag=UseMipLevelFlag>>15;
+}rwTextureStruct;
+
+typedef struct {
+    rwChunk   Texture;//ChunkID 6
+    rwTextureStruct TextureStruct;
+    rwString TextureName;
+    rwString AlphaTextureName;//0x2
+    rwChunk  TextureExtension;//ChunkID 3
+}RwTexture;
+
+typedef struct{
+    //DWORD   rwID<format=hex>;//0x0253F2FC
+    FLOAT   EnvironmentMapScaleX;//- Environment Map Scale X
+    FLOAT   EnvironmentMapScaleY;//- Environment Map Scale Y
+    FLOAT   EnvironmentMapOffsetX;//- Environment Map Offset X
+    FLOAT   EnvironmentMapOffsetY;//- Environment Map Offset Y
+    FLOAT   ReflectionIntensity ;//- Reflection Intensity (Shininess, 0.0-1.0)
+    DWORD   EnvironmentTexturePtr;//- Environment Texture Ptr, always 0 (zero)
+}rwReflectionMaterial;
+
+
+typedef struct{
+uint32  type;
+if(type==1){
+    uint32 rwMATFXEFFECTBUMPMAP;//- 0x01, rwMATFXEFFECTBUMPMAP
+    float  Intensity;//- Intensity
+    int    ContainsBumpMap;//bool32 - Contains Bump Map
+    if(ContainsBumpMap==1)RwTexture  BumpMap;//- Bump Map (Only if effect contains a bump map)
+    int    ContainsHeightMap;//bool32 - Contains Height Map    
+    if(ContainsHeightMap==1)RwTexture  HeightMap;//- Height Map (Only if the effect contains a height map)
+    int padding;
+}else if(type==2){
+    uint32  rwMATFXENVMAP;//- 0x02, rwMATFXENVMAP
+    float   ReflectionCoefficient;//- Reflection Coefficient (default is 1.0)
+    int     UseFrameBufferAlhpa;// bool32 - Use Frame Buffer Alpha Channel
+    int     ContainsEnvironmentMap;//bool32 - Contains Environment Map
+    if(ContainsEnvironmentMap==1)RwTexture   EnvironmentMap;
+    int padding;
+}else if(type==3){
+    uint32  rwMATFXEFFECTDUAL;//- 0x04, rwMATFXEFFECTDUAL
+    int32   srcBlendMode;//- src blend mode
+    int32   destBlendMode;//- dest blend mode
+    int     ContainsTexture;//bool32     - Contains Texture
+    if (ContainsTexture==1)RwTexture  Texture;
+    int padding;
+}else if(type==4){
+    uint32  rwMATFXEFFECTDUAL;//- 0x04, rwMATFXEFFECTDUAL
+    int32   srcBlendMode;//- src blend mode
+    int32   destBlendMode;//- dest blend mode
+    int     ContainsTexture;//- Contains Texture
+    if(ContainsTexture==1)RwTexture  Texture;
+    int padding;
+}else if(type==5){
+    uint32  rwMATFXEFFECTUVTRANSFORM;//- 0x05, rwMATFXEFFECTUVTRANSFORM
+}else if(type==6){
+    uint32  rwMATFXEFFECTDUALUVTRANSFORM;//- 0x06, rwMATFXEFFECTDUALUVTRANSFORM
+}
+
+}rwMaterialEffectsPLG;
+
+
+
+typedef struct{
+    DWORD   rwID<format=hex>;//0x3
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    local DWORD EndOffset=FTell()+ChunkSize;
+    if (ChunkSize>0){
+        do{
+            rwChunk ChunkHeader<hidden=true>;
+            if(ChunkHeader.rwID==0x0253F2FC){
+                rwReflectionMaterial    ReflectionMaterial;//0x0253F2FC
+            }
+            else if(ChunkHeader.rwID==0x120){
+                rwMaterialEffectsPLG    MaterialEffectsPLG;//0x120
+            }
+            else{byte    UnknownData[ChunkHeader.ChunkSize];}
+        }while(FTell()<EndOffset);
+    }
+}rwMaterialExtension;
+
+typedef struct 
+{
+    float ambient;   /**< ambient reflection coefficient */
+    float specular;  /**< specular reflection coefficient */
+    float diffuse;   /**< reflection coefficient */
+}RwSurfaceProperties;
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    int     flag;//unused
+    ubyte   colorRGBA[4];
+    int     unused;
+    int     HasTexture;
+    RwSurfaceProperties surfaceProps;/* Surface properties */  
+}rwMateriaStruct;
+
+typedef struct{
+    rwChunk MaterailHeader;//0x7
+    rwMateriaStruct MateriaStruct;
+    if (MateriaStruct.HasTexture==1) RwTexture Texture;//allow empty textures
+    rwMaterialExtension MaterialExtension;//0x3
+}rwMaterial;//[MaterialListStruct.MaterialCount]<optimize=false>;
+
+typedef struct{
+DWORD   rwID<format=hex>;
+DWORD   ChunkSize;
+DWORD   rwVersion<format=hex>;
+DWORD   MaterialCount;
+int     RGBA[MaterialCount];
+}rwMaterialListStruct;
+
+typedef struct{
+    //DWORD   rwID<format=hex>;//0x50E
+    int     FaceType;//type of face (usually equal to 1, pointing to Triangle Strip - triangle)
+    DWORD   SplitCount;//number of material partitions
+    DWORD   FaceCount;//number of faces
+    struct{
+        DWORD   FaceCount;//index of the face
+        DWORD   MatrialID;//material index
+        DWORD   Indices[FaceCount];
+    }Split[SplitCount]<optimize=false>;
+}rwBinMeshPLG;// Material Split
+
+
+typedef struct{
+    ubyte   BoneCount;
+    ubyte   SpecialIndicesCount;//number of used bones
+    ubyte   byte3;
+    ubyte   byte4;
+    ubyte   SpecialIndices[SpecialIndicesCount];//used bones
+    struct{
+        byte    BoneIndex1234[4];
+    }VertexBoneIndice[GeometryStruct.VertexCount];
+    struct{
+        float    VertexBoneWeight1234[4];
+    }VertexBoneWeight[GeometryStruct.VertexCount];
+    struct{
+        float   Row1[4];
+        float   Row2[4];
+        float   Row3[4];
+        float   Row4[4];
+    }InverseBoneMatrices[BoneCount];
+    float   Unknown[3];
+}SkinPLG;
+
+typedef struct{
+rwChunk GeometryExtension;
+if (GeometryExtension.ChunkSize>0)
+{
+    local DWORD GeometryExtEndOffset = FTell() + GeometryExtension.ChunkSize;
+    do{
+    rwChunk     ChunkHeader<hidden=true>;
+    if(ChunkHeader.rwID==0x50E)
+    {
+        rwBinMeshPLG BinMeshPLG;//0x50E
+    }
+    else if(ChunkHeader.rwID==0x116)
+    {
+        SkinPLG skinPLG;
+    }
+    else
+    {
+        byte    UnknownData[ChunkHeader.ChunkSize];
+    }
+    }while(FTell()<GeometryExtEndOffset);
+}//end GeometryExtenison
+}GeometryExtenison;
+
+typedef struct{
+    DWORD   RWpluginIdentifier;//(e.g. 0x0116 or 0x0120)
+    DWORD   extraData;
+}rwRightToRender;
+
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    DWORD   FrameIndex;// zero-based index
+    DWORD   GeometryIndex;// zero-based index
+    DWORD   flags;//0x01 rpATOMICCOLLISIONTEST, 0x04 rpATOMICRENDER
+    DWORD   unused; // sets to 0 by default
+}rwAtomicStruct;
+
+typedef struct{
+    DWORD   rwID<format=hex>;
+    DWORD   ChunkSize;
+    DWORD   rwVersion<format=hex>;
+    local DWORD EndOffset=FTell()+ChunkSize;
+    if (ChunkSize>0)
+    {
+        do{    
+            rwChunk ChunkHeader<hidden=true>;
+            if(ChunkHeader.rwID==0x120)
+            {
+                int  MatFXenabled;//bool32- MatFX enabled MaterialEffectsPLG 0x120
+            }
+            else if(ChunkHeader.rwID==0x1f){
+                rwRightToRender RightToRender;//not used
+            }else
+            {
+                byte    UnknownData[ChunkHeader.ChunkSize];
+            }
+        }while(FTell()<EndOffset);
+    }
+}rwAtomicExtension;
+
+typedef struct{
+    rwChunk GeometryHeader;//0xF
+    rwGeometryStruct GeometryStruct;
+    rwChunk MaterialListHeader;//0x8
+    rwMaterialListStruct MaterialListStruct;
+    rwMaterial MaterialList[MaterialListStruct.MaterialCount]<optimize=false>;
+    GeometryExtenison geometryExtenison;
+}Geometry;
+
+typedef struct{            
+    rwChunk FrameListHeader;//0xE
+    rwFrameListStruct FrameListStruct;
+    rwFrameExtension FrameExtension[FrameListStruct.FrameCount]<optimize=false>;//0x3; HAnimPLG;
+}FrameList;
+
+typedef struct{
+    rwChunk GeometryListHeader;//0x1A
+    rwGeometryListStruct    GeometryListStruct;
+    Geometry geometry[GeometryListStruct.GeometryCount]<optimize=false>;
+}GeometryList;
+
+typedef struct{
+    rwChunk AtomicHeader;//0x14
+    rwAtomicStruct  AtomicStruct; 
+    rwAtomicExtension   AtomicExtension;
+}Atomic;
+
+do{
+    struct{
+        rwChunk ClumpHeader;//0x10
+        local DWORD ClumpChunkEnd = FTell() + ClumpHeader.ChunkSize;
+        rwClumpStruct ClumpStruct;
+        FrameList frameList;
+        GeometryList geometryList;
+        Atomic atomic[ClumpStruct.numAtomics]<optimize=false>;
+        while(FTell()<ClumpChunkEnd){
+        rwUnknownChunk ClumpExtension;
+        }
+    }Clump;
+}while(FTell()<FileSize());
+
+
+
+
+/*
+rwMaterialEffectsPLG
+ 0 rwMATFXEFFECTNULL            No Effect
+ 1 rwMATFXEFFECTBUMPMAP         Bump Map
+ 2 rwMATFXEFFECTENVMAP          Environment Map (Reflections)
+ 3 rwMATFXEFFECTBUMPENVMAP      Bump Map/Environment Map
+ 4 rwMATFXEFFECTDUAL            Dual Textures
+ 5 rwMATFXEFFECTUVTRANSFORM     UV-Tranformation
+ 6 rwMATFXEFFECTDUALUVTRANSFORM Dual Textures/UV-Transformation
+
+rwMaterialEffectsPLG
+uint32  - Type (Header)
+ First Effect (variable size)
+ Second Effect (variable size)
+Material Effects PLG is an extension to the Material section in the Renderware stream file format. It is part of the Renderware Toolkit and can be used to attach certain effects to a material, such as bump mapping, reflections and UV-Animations.
+
+If a material defines material effects, the Atomic that draws the material's parent geometry also contains a material effects extension. However, the format of this section is different from the actual one that is defined for the material.
+
+Contents
+1	Binary structure
+2	Header
+3	Effects (Types)
+3.1	No Effect (rwMATFXNULL)
+3.2	Bump Mapping (rwMATFXEFFECTBUMPMAP)
+3.3	Environment Mapping (rwMATFXENVMAP)
+3.4	Dual Texturing (rwMATFXEFFECTDUAL)
+3.5	UV-Animation (rwMATFXEFFECTUVTRANSFORM)
+4	Atomic extension
+5	Rendering
+5.1	Environment mapping
+6	See also
+Binary structure
+Basically each section is structured starting with a header, that contains a effect type identifier, followed by two effects that can be overlayed, if the effect type supports it.
+
+ uint32  - Type (Header)
+ First Effect (variable size)
+ Second Effect (variable size)
+It's certain, that at least the second effect is not used, even both effects can be disabled by setting the type identifier to 0x00 (rwMATFXNULL). It is important to note, that the effect rwMATFXNULL allocates 4 bytes of memory for it's effect header.
+
+Header
+The section starts with a type identifier. The section's actual size depends on the section type.
+
+ uint32  - Type
+The section type can be of one of the following values:
+
+ 0 rwMATFXEFFECTNULL            No Effect
+ 1 rwMATFXEFFECTBUMPMAP         Bump Map
+ 2 rwMATFXEFFECTENVMAP          Environment Map (Reflections)
+ 3 rwMATFXEFFECTBUMPENVMAP      Bump Map/Environment Map
+ 4 rwMATFXEFFECTDUAL            Dual Textures
+ 5 rwMATFXEFFECTUVTRANSFORM     UV-Tranformation
+ 6 rwMATFXEFFECTDUALUVTRANSFORM Dual Textures/UV-Transformation
+The effect types 3 (rwMATFXEFFECTBUMPENVMAP) and 6 (rwMATFXEFFECTDUALUVTRANSFORM) are requiring both effects to be set. For all other section types, the second effect is usually set to 0 (rwMATFXEFFECTNULL).
+
+Effects (Types)
+Each effect starts with a header on it's own, containing the effect identifier. The effect identifier is of the same type as the section identifier and therefor the effect identifier of the first effect typically equals the section identifier. Exceptions are the section types 3 (rwMATFXEFFECTBUMPENVMAP) and 6 (rwMATFXEFFECTDUALUVTRANSFORM), which are invalid when beeing used as effect type.
+
+No Effect (rwMATFXNULL)
+The effect starts with a header, containing its type identifier.
+
+ uint32  - 0x00, rwMATFXEFFECTNULL
+There are no other contents stored within this effect.
+
+Bump Mapping (rwMATFXEFFECTBUMPMAP)
+The effect starts with a header, containing its type identifier, followed by some settings.
+
+ uint32      - 0x01, rwMATFXEFFECTBUMPMAP
+ float32     - Intensity
+ bool32      - Contains Bump Map
+ RwTexture   - Bump Map (Only if effect contains a bump map)
+ bool32      - Contains Height Map
+ RwTexture   - Height Map (Only if the effect contains a height map)
+Note that there are two switches within the effect, that determine the existence of two child sections, containing the actual bump or height map. The textures are stored as raw RwTextures, simply within the effect structure.
+
+Bump maps are restricted in their format: The actual texture inside the TXD archive needs to be stored in X8R8G8B8-Format, meaning there are four 8-bit channels for red, green, blue and alpha. However, bump maps do not support alpha maps (a second texture that encodes opacity-information per texel), compression or mip-mapping for performance reasons.
+
+Environment Mapping (rwMATFXENVMAP)
+Environment maps are used to simulate real-time reflections by blending in a pre-rendered environmental texture. Renderware does not support real-time reflections, besides Environment Mapping out of the box, but it can be hooked up with mods like ENBSeries.
+
+ uint32      - 0x02, rwMATFXENVMAP
+ float32     - Reflection Coefficient (default is 1.0)
+ bool32      - Use Frame Buffer Alpha Channel
+ bool32      - Contains Environment Map
+ RwTexture   - Environment Map
+The effect itself contains a switch that determines the existence of a environment map in form of a texture. If the switch is true, the texture is stored as a raw RwTexture section, succeeded by the switch itself.
+
+Dual Texturing (rwMATFXEFFECTDUAL)
+Dual Texturing enables the engine to blend two textures together. The effect therefor defines a set of blending options.
+
+ uint32     - 0x04, rwMATFXEFFECTDUAL
+ int32      - src blend mode
+ int32      - dest blend mode
+ bool32     - Contains Texture
+ RwTexture  - Texture
+If the effect contains a texture, it is stored as a raw RwTexture section right after the Contains Texture option. The Blend Mode options defines how two textures are blended together. Basically each mode executes a different vector function that returns the blending result for each texel.
+
+The first set of blend functions returns a constant value for each texel.
+
+ 0x00 - rwNOBLEND
+ 0x01 - rwBLENDZERO             (0,    0,    0,    0   )
+ 0x02 - rwBLENDONE              (1,    1,    1,    1   )
+ 0x03 - rwBLENDSRCCOLOR         (Rs,   Gs,   Bs,   As  )
+ 0x04 - rwBLENDINVSRCCOLOR      (1-Rs, 1-Gs, 1-Bs, 1-As)
+ 0x05 - rwBLENDSRCALPHA         (As,   As,   As,   As  )
+ 0x06 - rwBLENDINVSRCALPHA      (1-As, 1-As, 1-As, 1-As)
+ 0x07 - rwBLENDDESTALPHA        (Ad,   Ad,   Ad,   Ad  )
+ 0x08 - rwBLENDINVDESTALPHA     (1-Ad, 1-Ad, 1-Ad, 1-Ad)
+ 0x09 - rwBLENDDESTCOLOR        (Rd,   Gd,   Bd,   Ad  )
+ 0x0A - rwBLENDINVDESTCOLOR     (1-Rd, 1-Gd, 1-Bd, 1-Ad)
+ 0x0B - rwBLENDSRCALPHASAT      (f,    f,    f,    1   )  f = min (As, 1-Ad)
+The very first function, rwNOBLEND, disables blending at all, meaning that only the base texture of the material will be drawn. In the other cases the final color is the sum of the base texture multiplied by the value of the dest Blend mode and the dual pass texture multiplied by the value of the src blend mode.
+
+UV-Animation (rwMATFXEFFECTUVTRANSFORM)
+UV-Animation itself does not contain any further information, besides it obligatory header.
+
+ uint32     - 0x05, rwMATFXEFFECTUVTRANSFORM
+If this effect is defined, the Material also contains a UV Animation PLG extension.
+
+Atomic extension
+Renderware does not support advanced shading or physically based rendering (PBR). In order to better quality rendering, it defines different rendering pipelines a draw call can be passed to. Each pipeline supports different features, like Bump Mapping for the illusion of uneven or rough surfaces, Environment Mapping to approximate reflection or Vertex Colors to support approximative precalculated lightning. Rockstar even defined a set of custom rendering pipelines to support their custom engine features, like reflective materials or extra vertex colors. For more information about the general rendering workflow in Renderware, please refer to the RenderWare article.
+
+In order to choose the right parameters for the rendering pipelines, while passing each Atomic to a draw-call, the Atomic itself needs to know which effects the linked geometry uses. The MatFX plugin uses another Material chunk that specifies whether the MatFX pipeline should be attached to the Atomic:
+
+ bool32     - MatFX enabled
+In RW versions >= 3.4.0.0 this chunk is only written when the value is 1.
+
+An Atomic can also have a Right To Render chunk in its Extension data, this however is ignored by the engine. In the case of MatFX this chunk is only written when a null-pipeline was attached when the file was written. This is generally the case if the file was exported from a modeling program.
+
+Rendering
+Environment mapping
+Environment mapping on the PS2 works different than on the PC in some ways:
+
+The environment effect is rendered as a second pass and hence uses alpha blending which gives a different result than using multiple texture stages
+The environment pass uses the same vertex colors as the diffuse pass
+Texture coordinates are generated differently (independent of camera position)
+For an implementation of PS2-like env-mapping on PC see SkyGfx
+*/
+
+
+/*
+rwRightToRender RightToRender;//not used
+// An Atomic can also have a Right To Render chunk in its Extension data, this however is ignored by the engine.
+// In the case of MatFX this chunk is only written when a null-pipeline was attached when the file was written.
+// This is generally the case if the file was exported from a modeling program.
+// optional. Used for Skin Rights or/and Normal Map Rights.
+// It records which pipeline was attached to the Atomic or Material when it was being written so that it can be attached again when the file is read.
+*/
+
+/*
+Atomic section
+MaterialEffectsPLG 0x120 int  MatFXenabled;//bool32- MatFX enabled 
+In RW versions >= 3.4.0.0 this chunk is only written when the value is 1.
+Renderware does not support advanced shading or physically based rendering (PBR). 
+In order to better quality rendering, it defines different rendering pipelines a draw call can be passed to. 
+Each pipeline supports different features, like Bump Mapping for the illusion of uneven or rough surfaces,
+Environment Mapping to approximate reflection or Vertex Colors to support approximative precalculated lightning. 
+Rockstar even defined a set of custom rendering pipelines to support their custom engine features, 
+like reflective materials or extra vertex colors. For more information about the general rendering workflow in Renderware, 
+please refer to the RenderWare article.
+
+In order to choose the right parameters for the rendering pipelines, while passing each Atomic to a draw-call, 
+the Atomic itself needs to know which effects the linked geometry uses. 
+The MatFX plugin uses another Material chunk that specifies whether the MatFX pipeline should be attached to the Atomic:
+*/
+
+
+
+/*
+rwTextureStruct;
+ 1byte Texture filtering (Texture filtering modes)
+  4bit U-addressing
+  4bit V-addressing
+  1bit Does texture use mip levels
+15bits padding
+
+Texture filtering modes
+
+0 - FILTERNAFILTERMODE (filtering is disabled)
+1 - FILTERNEAREST (Point sampled)
+2 - FILTERLINEAR (Bilinear)
+3 - FILTERMIPNEAREST (Point sampled per pixel mip map)
+4 - FILTERMIPLINEAR (Bilinear per pixel mipmap)
+5 - FILTERLINEARMIPNEAREST (MipMap interp point sampled)
+6 - FILTERLINEARMIPLINEAR (Trilinear)
+
+Texture addressing modes
+
+0 - TEXTUREADDRESSNATEXTUREADDRESS (no tiling)
+1 - TEXTUREADDRESSWRAP (tile in U or V direction)
+2 - TEXTUREADDRESSMIRROR (mirror in U or V direction)
+3 - TEXTUREADDRESSCLAMP
+4 - TEXTUREADDRESSBORDER
+*/
+
+
+/*
+rwGeometryStruct
+Flags are the values that define the contents of the geometry section. Expand to logical values ​​by dividing by 2 and checking the remainder (or you can just check each bit). Values ​​in iterations:
+
+DFF flags
+Flag Binary view    Name Description
+1   0000 0001       rpWORLDTRISTRIP     on the model used Triangle strip (usually in DFF since version 3.4), are exported by Deniski scripts.
+2   0000 0010       Meshes              in geometry have sections of Verticles and Faces
+4   0000 0100       rpWORLDTEXTURED     in geometry there is a section UV Mapping level 1, for export, the UV option in the Kama script must be enabled
+8   0000 1000       rpWORLDPRELIT       in geometry there is a section of Vertex Colors, for export the VCol option in Kama scripts should be enabled
+16  0001 0000       rpWORLDNORMALS      in geometry there is a section of Normals, for export option Nor in Kama scripts should be included
+32  0010 0000       rpWORLDLIGHT        defines a certain dynamic vertex lightning
+64  0100 0000       rpWORLDMODULATEMATERIALCOLOR    color of the material, for export, the MMC option in Kama or Deniski scripts must be enabled
+128 1000 0000       Textured_2          in geometry there are sections UV Mapping level 1, UV Mapping level 2 and UV Mapping level 3, export is supported only by the official exporter in DFF from Criterion Games.
+Stream structure
+RW Stream Section
+Geometry
+0x000F
+When streamed in/out it is usually the child of a Geometry List chunk and the parent of a Struct, Material List and Extension chunk.
+
+The format of the Geometry's Struct chunk is as follows:
+
+int32        format (see below)
+int32        number of triangles (numTriangles)
+int32        number of vertices (numVertices)
+int32        number of morph targets (numMorphTargets) (morphing is not used in GTA series, so this is always 1)
+#if version < 0x34000
+  surface properties:
+    float32  ambient
+    float32  specular
+    float32  diffuse
+#endif
+
+#if (format & rpGEOMETRYNATIVE) == 0
+    #if (format & rpGEOMETRYPRELIT)
+        RwRGBA   prelitcolor[numVertices] (RwRGBA: uint8 r, g, b, a)
+    #endif
+
+    #if format & (rpGEOMETRYTEXTURED | rpGEOMETRYTEXTURED2)
+        #repeat numTexSets (see below)
+            RwTexCoords    texCoords[numVertices]  (RwTexCoords: float32 u, v)
+        #endrepeat
+    #endif
+   
+    RpTriangle   triangles[numTriangles]  (RpTriangle: uint16 vertex2, vertex1, materialId, vertex3)
+#endif
+
+#repeat numMorphTargets
+    RwSphere    boundingSphere    (RwSphere: float32 x, y, z, radius)
+    bool32      has vertices
+    bool32      has normals
+    #if has vertices
+        RwV3d   vertices[numVertices] (RwV3d: float32 x, y, z)
+    #endif
+    #if has normals
+        RwV3d   normals[numVertices]
+    #endif
+#endrepeat
+Format
+The following flags describe the behaviour of the mesh during the rendering progress. Some of the flags indicate the existence of data inside the following file format.
+
+Flag	Name	Description
+0x00000001	rpGEOMETRYTRISTRIP	Is triangle strip (if disabled it will be an triangle list)
+0x00000002	rpGEOMETRYPOSITIONS	Vertex translation
+0x00000004	rpGEOMETRYTEXTURED	Texture coordinates
+0x00000008	rpGEOMETRYPRELIT	Vertex colors
+0x00000010	rpGEOMETRYNORMALS	Store normals
+0x00000020	rpGEOMETRYLIGHT	Geometry is lit (dynamic and static)
+0x00000040	rpGEOMETRYMODULATEMATERIALCOLOR	Modulate material color
+0x00000080	rpGEOMETRYTEXTURED2	Texture coordinates 2
+0x01000000	rpGEOMETRYNATIVE	Native Geometry
+Bits 16-23 (mask 0x00FF0000) in the format description give the number of texture coordinate sets (numTexSets). If the value in the file is zero, rpGEOMETRYTEXTURED means there is one set of texture coordinates, rpGEOMETRYTEXTURED2 means there are two.
+
+If rpGEOMETRYNATIVE is set, the platform dependent geometry data is to be found in the Native Data chunk.
+
+*/
+
+
+/*  rwAtomicStruct flags
+0x01 rpATOMICCOLLISIONTEST - A generic collision flag to indicate that the atomic should be considered in collision tests. It wasn't used in GTA games since they don't use RW collision system.
+0x04 rpATOMICRENDER        - The atomic is rendered if it is in the view frustum. It's set to TRUE for all models by default.
+*/
+
+/*
+rwHAnimPLG
+flags;/*动画层次结构的标志
+     1 SUBHIERARCHY  - 层次结构继承自另一个层次结构
+     2 NOMATRICES  - 层次结构不使用骨骼的局部矩阵
+  4096 UPDATEMODELLINGMATRICES  - 更新局部骨骼矩阵
+  8192 UPDATELTMS  - 执行骨骼世界矩阵的重新计算
+ 16384 LOCALSPACEMATRICES  - 层次结构计算局部空间中的矩阵
+*/

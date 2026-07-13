@@ -1,0 +1,374 @@
+//--------------------------------------
+//--- 010 Editor v4.0.3 Binary Template
+//
+// File:Manhunt2 MDL Format
+// Author:Allen
+// Revision:2019-11-02
+// Purpose:
+//--------------------------------------
+LittleEndian();
+typedef struct
+{
+    int     NextEntryIndexOffset;//if == 0x20, is last entry or just have 1 entry
+    int     PrevEntryIndexOffset;//if == 0x20,just have 1 entry
+    int     EntryOffset;
+    int     zero;
+}EntryIndex;//项目索引
+
+typedef struct
+{
+    int     RootBoneOffset;
+    int     zero[3];
+    int     unknown;//rootbone flag;
+    local int objectInfoIndexOffset = FTell();
+    struct  {
+        int     FirstObjectInfoOffset;//this position is this objectInfoIndexOffset, if FirstObjectInfoOffset == objectInfoIndexOffset , is not have object
+        int     LastObjectInfoOffset;//if firstoffset = lastoffset,just have 1 objectinfo
+        int     zero2;
+    }objectInfoIndex;
+}Entry;//项目
+
+typedef struct
+{
+    int     NextObjectInfoOffset;//if == objectInfoIndexOffset,is last objectInfo,or just have 1 objectinfo.
+    int     PrevObjectInfoOffset;//如果是第一个索引则为objectInfoIndexOffset，第二个就是正常的上个数据了
+    int     ObjectParentBoneOffset;//object.transform need *= object.parent.transform
+    int     ObjectOffset;
+    int     RootEntryOffset;//所属项目的偏移地址
+    int     zero;
+    int     unknown;//always is 0x3
+}ObjectInfo;
+
+
+/*
+typedef struct
+{
+byte    unknown[4];
+int     NextBrotherBoneOffset;//if==0,is not have
+int     ParentBoneOffset;//if==0,is not have
+int     RootBoneOffset;
+int     SubBoneOffset;//if==0,is not have
+int     BoneHierarchyLevelDataIndexOffset;//通常在第二个骨骼，但是也有个例！！！
+char    BoneName[40];
+float   Matrix4X4[16];
+float   Matrix4X4[16];
+}Bone;
+*/
+typedef struct
+{
+    int     NumBone;
+    int     unknown;
+    int     RootBoneOffset;
+    int     AnimBoneDataOffset;
+    int     BoneTransformOffset;//not sure
+    int     zero;
+}AnimBoneDataIndex;
+
+typedef struct
+{
+    short   BoneID;//Animation Key ID
+    short   BoneType;//if == 0 , then the bone is no parent,start id : 1;
+    int     BoneOffset;
+}AnimBoneData;//BoneHierarchyLevelData[NumBone]
+
+typedef struct
+{
+    float   Transform[8];//not sure
+}BoneTransform;//BoneTransform[NumBone]
+
+typedef struct Matrix(int numBone){
+    struct {
+    float   Matrix4x4[16];//inverse bone matrix ,Y aixs -90 rotate
+    }Matrix4x4[numBone];
+};
+
+typedef struct{
+    float   Matrix4x4[16];//inverse bone matrix ,Y aixs -90 rotate
+}Matrix4x4;
+
+typedef struct{
+ char    BoneName[40];
+}BoneName;
+
+void ReadBone()
+{
+    struct{
+        int     unknown;
+        int     SilbingBoneOffset;//if==0,is not have
+        int     ParentBoneOffset;//if==0,is not have
+        int     RootBoneOffset;
+        int     SubBoneOffset;//if==0,is not have
+        int     AnimBoneDataIndexOffset;//通常在第二个骨骼，但是也有个例！！！
+        BoneName    boneName;
+        Matrix4x4   ParentChildPos;
+        Matrix4x4   WorldPos;
+    }Bone;
+    local int sub = Bone.SubBoneOffset;
+    local int sib = Bone.SilbingBoneOffset;
+    local int animBoneDataIndexOffset = Bone.AnimBoneDataIndexOffset;
+    if(animBoneDataIndexOffset > 0)
+    {
+        FSeek(animBoneDataIndexOffset);
+        AnimBoneDataIndex animBoneDataIndex;
+        if(animBoneDataIndex.AnimBoneDataOffset != 0)
+        {
+            FSeek(animBoneDataIndex.AnimBoneDataOffset);
+            AnimBoneData animBoneData[animBoneDataIndex.NumBone]<optimize=false>;
+        }
+        if(animBoneDataIndex.BoneTransformOffset!=0)
+        {
+            FSeek(animBoneDataIndex.BoneTransformOffset);
+            BoneTransform boneTransform[animBoneDataIndex.NumBone]<optimize=false>;
+        }
+    }
+    if(sub>0)
+    {
+        FSeek(sub);
+        ReadBone();
+    }
+    if (sib>0)
+    {
+        FSeek(sib);
+        ReadBone();
+    }
+
+};
+
+
+
+typedef struct Face{
+    short	XYZ[3];
+};
+
+typedef struct Normal{
+    short X;//need /32768.0 get value
+    short Y;
+    short Z;
+    short padding;
+};
+typedef struct Vertex{
+float   X;
+float   Y;
+float   Z;
+};
+
+typedef struct SkinWeight{
+float		weight[4];
+byte        boneID[4];
+};
+
+typedef struct Color{
+ubyte   BGRA[4];
+};
+
+typedef struct UV{
+float   U;
+float   V;
+};
+
+typedef struct
+{
+Vertex      vertex;
+SkinWeight  skinWeight;
+Normal      normal;
+Color       color;
+UV          UV1;
+UV          UV2;
+}Vertex125E;
+
+typedef struct
+{
+Vertex      vertex;
+SkinWeight  skinWeight;
+Normal      normal;
+Color       color;
+UV          UV1;
+}Vertex115E;
+
+typedef struct
+{
+Vertex      vertex;
+Normal      normal;
+Color       color;
+}Vertex52;
+
+typedef struct
+{
+Vertex      vertex;
+Normal      normal;
+Color       color;
+UV          UV1;
+}Vertex152;
+
+typedef struct
+{
+Vertex      vertex;
+Normal      normal;
+Color       color;
+UV          UV1;
+UV          UV2;
+}Vertex252;
+
+typedef struct
+{
+    int     TexNameOffset;
+    byte    bLoaded;//bool
+    byte    Color_RGBA[4];//Diffuse
+    byte    padding[3];
+    local int nextMaterialOffset =FTell();
+    FSeek(TexNameOffset);
+    string TexName;
+    FSeek(nextMaterialOffset);
+}Material;//if mutil texture , Material[numTexture];
+
+typedef struct VertexElement(int Type){
+	Type = Type >> 8;
+	local short numUV = Type & 0xf;
+	local int skinFlag = Type >> 4;
+
+    Vertex      vertex;
+    if (skinFlag==1){SkinWeight  skinWeight;}
+    Normal   normal;
+    Color   color;
+    if (numUV>0)
+    {   
+        UV  UV1;
+        if(numUV>1) UV UV2;
+    }
+};
+
+typedef struct
+{
+    string  TextureName[];//00 is end
+}TextureName;
+
+typedef struct
+{
+int     numBone;
+int     BoneTransDataOffset;
+}BoneTransDataIndex;//inverse bone matrix ,Y aixs -90 rotate
+
+
+
+typedef struct
+{
+    float   Matrix4X4[16];
+}BoneTransData;//BoneTransData[numData]
+
+typedef struct
+{
+    float   BoundingBoxMinX;
+    float   BoundingBoxMinY;
+    float   BoundingBoxMinZ;
+    float   BoundingBoxMaxX;
+    float   BoundingBoxMaxY;
+    float   BoundingBoxMaxZ;
+    short   MaterialIDNumFace;//need / 3
+    short   MaterialID;
+    short   StartFaceID;//need / 3
+    short   unknown;//Always 0x7C91 or 0x91
+    byte    zero[12];
+}MaterialIDs;//[numMatrialParts];
+
+typedef struct
+{
+    int     MaterialOffset;
+    int     NumMaterials;
+    int     BoneTransDataIndexOffset;//if==0,is not have
+    float   uknnown;
+    int     unknown2;//always is 1
+    float   unknown3[3];
+    int     modelChunkFlag;//chunkStart
+    int     modelChunkSize;
+    int     zero;
+    int     numMatrialIDs;
+    int     numFaceIndex;
+    float   boundingSphereXYZ[3];
+    float   boundingSphereRadius;
+    float   boundingSphereScale[3];
+    int     numVertex;
+    int     zero2[3];
+    int     PerVertexElementSize;//0x18,0x20,0x34,0x3C
+    int     unknown4[11];
+    int     VertexElementType;//0x52,0x152,0x115E,0x125E
+    int     unknown5[8];
+    struct MaterialIDs mtlIDs[numMatrialIDs];
+    struct Face face[numFaceIndex/3];
+    struct{
+        VertexElement vertexElement(VertexElementType)[numVertex]<optimize=false>;
+    }vertices;
+    //chunk end
+}Object;
+
+
+
+typedef struct
+{
+    int     offset;
+}Table;//table[numTable];  只要是偏移都会被记录到这个表格
+void MDL()
+{
+
+    EntryIndex entryIndex;
+    FSeek(entryIndex.EntryOffset);
+    Entry entry;
+    
+    
+    FSeek(entry.RootBoneOffset);
+    ReadBone();
+    if(entry.objectInfoIndex.FirstObjectInfoOffset !=  entry.objectInfoIndexOffset)
+    {
+        FSeek(entry.objectInfoIndex.FirstObjectInfoOffset);
+        do
+        {
+            ObjectInfo objectInfo;
+            FSeek(objectInfo.ObjectOffset);
+            Object object;
+            
+            if(object.MaterialOffset!=0)
+            {
+                FSeek(object.MaterialOffset);
+                Material material[object.NumMaterials]<optimize=false>;
+            }
+            if(object.BoneTransDataIndexOffset!=0)
+            {
+                FSeek(object.BoneTransDataIndexOffset);
+                BoneTransDataIndex boneTransDataIndex;
+                FSeek(boneTransDataIndex.BoneTransDataOffset);
+                Matrix Matrix4x4List(boneTransDataIndex.numBone);
+            }
+            if (objectInfo.NextObjectInfoOffset != entry.objectInfoIndexOffset)
+            {
+                FSeek(objectInfo.NextObjectInfoOffset);
+            }
+        }while(objectInfo.NextObjectInfoOffset != entry.objectInfoIndexOffset);
+    }
+}
+struct
+{
+    char    PMLC[4];
+    DWORD   version;
+    DWORD   fileSize;
+    DWORD   DataSize;
+    DWORD   OffsetTable;
+    DWORD   numTable;
+    DWORD   zero1;
+    DWORD   zero2;
+    int     FirstEntryIndexOffset;//根项
+    int     LastEntryIndexOffset;
+}MDLHeader;
+
+FSeek(MDLHeader.FirstEntryIndexOffset);
+local int next;
+do
+{
+    MDL();
+    next = entryIndex.NextEntryIndexOffset;
+    if(next!=0x20)
+    {
+        FSeek(next);        
+    }    
+}while(next!=0x20);
+
+FSeek(MDLHeader.OffsetTable);
+Table table[MDLHeader.numTable];
